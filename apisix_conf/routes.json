@@ -1,0 +1,26 @@
+{
+  "auth-http-route": {
+    "uri": "/auth/*",
+    "service_id": "auth-service",
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "desc": "Auth service HTTP route"
+  },
+  "auth-grpc-route": {
+    "uri": "/auth/grpc/*",
+    "service_id": "auth-grpc-service", 
+    "methods": ["GET", "POST", "OPTIONS"],
+    "desc": "Auth service gRPC route"
+  },
+  "user-http-route": {
+    "uri": "/user/*",
+    "service_id": "user-service",
+    "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "desc": "User service HTTP route"
+  },
+  "user-grpc-route": {
+    "uri": "/user/grpc/*",
+    "service_id": "user-grpc-service",
+    "methods": ["GET", "POST", "OPTIONS"], 
+    "desc": "User service gRPC route"
+  }
+} 

@@ -1,124 +1,116 @@
 # Puchi Gateway
 
-Một API Gateway dựa trên Apache APISIX với monitoring và dashboard tích hợp.
+Gateway service sử dụng Apache APISIX để quản lý traffic đến các microservices của Puchi.
 
-## 🚀 Tính năng
+## Cấu trúc Services
 
-- **API Gateway**: Apache APISIX làm gateway chính
-- **Load Balancing**: Cân bằng tải giữa các upstream services
-- **Monitoring**: Prometheus + Grafana để theo dõi hiệu suất
-- **Dashboard UI**: Giao diện quản lý trực quan
-- **Service Discovery**: Tích hợp với etcd
+Gateway chỉ chứa các services cần thiết cho việc routing và monitoring:
 
-## 🏗️ Kiến trúc
+- **apisix**: API Gateway chính
+- **etcd**: Configuration store
+- **rabbitmq**: Shared message broker
+- **prometheus**: Monitoring metrics
+- **grafana**: Dashboard monitoring
 
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Client    │───▶│   APISIX    │───▶│   Web1/2    │
-│             │    │  Gateway    │    │  Services   │
-└─────────────┘    └─────────────┘    └─────────────┘
-                          │
-                    ┌─────────────┐
-                    │    etcd     │
-                    │  (Config)   │
-                    └─────────────┘
-                          │
-              ┌─────────────────────┐
-              │   Prometheus +      │
-              │     Grafana         │
-              │   (Monitoring)      │
-              └─────────────────────┘
-```
+Các microservices chạy độc lập:
 
-## 🛠️ Cài đặt và Chạy
+- **puchi-auth-service**: Service xác thực (port 8001, 9001)
+- **puchi-user-service**: Service quản lý user (port 8002, 9002)
 
-### Yêu cầu
+## Cấu hình Routing
 
-- Docker và Docker Compose
-- Ports: 9080, 9180, 9090, 3000, 2379
+### Auth Service Routes:
 
-### Khởi động
+- `/auth/*` → host.docker.internal:8001 (HTTP API)
+- `/auth/grpc/*` → host.docker.internal:9001 (gRPC)
+
+### User Service Routes:
+
+- `/user/*` → host.docker.internal:8002 (HTTP API)
+- `/user/grpc/*` → host.docker.internal:9002 (gRPC)
+
+## Ports
+
+### Gateway Services:
+
+- **APISIX**: 9080 (API), 9180 (Admin), 9091 (Prometheus), 9443 (HTTPS)
+- **etcd**: 2379
+- **RabbitMQ**: 5672 (AMQP), 15672 (Management)
+- **Prometheus**: 9090
+- **Grafana**: 3000
+
+### External Services (chạy độc lập):
+
+- **Auth Service**: 8001 (HTTP), 9001 (gRPC)
+- **User Service**: 8002 (HTTP), 9002 (gRPC)
+
+## Khởi chạy
+
+### 1. Khởi chạy Gateway:
 
 ```bash
-# Chạy toàn bộ stack
+cd puchi-gateway
+docker-compose up -d
+```
+
+### 2. Khởi chạy các microservices độc lập:
+
+```bash
+# Auth Service
+cd ../puchi-auth-service
 docker-compose up -d
 
-# Hoặc chạy standalone mode
-docker-compose -f docker-compose-standalone.yml up -d
+# User Service
+cd ../puchi-user-service
+docker-compose up -d
 ```
 
-## 📊 Dashboard và Monitoring
+### 3. Kiểm tra kết nối:
 
-### APISIX Dashboard UI
+```bash
+# Test Auth Service
+curl http://localhost:9080/auth/
 
-- **URL**: http://127.0.0.1:9180/ui
-- **Chức năng**: Quản lý routes, services, upstreams, plugins
-- **Authentication**: Sử dụng admin key từ config
-
-### Grafana Dashboard
-
-- **URL**: http://127.0.0.1:3000
-- **Chức năng**: Monitoring metrics, alerts, visualizations
-- **Default credentials**: admin/admin
-
-### Prometheus
-
-- **URL**: http://127.0.0.1:9090
-- **Chức năng**: Metrics collection và query
-
-## 🔧 Cấu hình
-
-### APISIX
-
-- **Admin API**: http://127.0.0.1:9180/apisix/admin
-- **Proxy**: http://127.0.0.1:9080
-- **Config**: `apisix_conf/config.yaml`
-
-### Upstream Services
-
-- **Web1**: http://127.0.0.1:9081 (hello web1)
-- **Web2**: http://127.0.0.1:9082 (hello web2)
-
-### etcd
-
-- **URL**: http://127.0.0.1:2379
-- **Prefix**: `/apisix`
-
-## 📁 Cấu trúc thư mục
-
-```
-puchi-gateway/
-├── apisix_conf/          # APISIX configuration
-├── etcd_conf/            # etcd configuration
-├── grafana_conf/         # Grafana dashboards & config
-├── prometheus_conf/      # Prometheus configuration
-├── upstream/             # Upstream service configs
-├── docker-compose.yml    # Main compose file
-└── README.md            # This file
+# Test User Service
+curl http://localhost:9080/user/
 ```
 
-## 🔑 API Keys
+## Monitoring
 
-- **Admin**: `edd1c9f034335f136f87ad84b625c8f1`
-- **Viewer**: `4054f7cf07e344346cd3f287985e76a2`
+- **APISIX Dashboard**: http://localhost:9180
+- **Prometheus**: http://localhost:9090
+- **Grafana**: http://localhost:3000
+- **RabbitMQ Management**: http://localhost:15672
 
-## 📈 Monitoring Metrics
+## Cấu hình Environment Variables
 
-Dashboard cung cấp các metrics:
+Các biến môi trường có thể được cấu hình trong file `.env`:
 
-- Request rate, latency, error rate
-- Upstream health status
-- Plugin performance
-- System resources
+```env
+APISIX_IMAGE_TAG=3.13.0-debian
+```
 
-## 🚀 Quick Start
+## Kiến trúc
 
-1. Clone repository
-2. Chạy `docker-compose up -d`
-3. Truy cập Dashboard UI: http://127.0.0.1:9180/ui
-4. Truy cập Grafana: http://127.0.0.1:3000
-5. Test API: http://127.0.0.1:9080
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Client        │───▶│   APISIX        │───▶│   Auth Service  │
+│                 │    │   Gateway       │    │   (Port 8001)   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │      etcd       │    │   User Service  │
+                       │   (Config)      │    │   (Port 8002)   │
+                       └─────────────────┘    └─────────────────┘
+                              │
+                ┌─────────────────────────────┐
+                │   Prometheus + Grafana      │
+                │   (Monitoring)              │
+                └─────────────────────────────┘
+```
 
-## 📝 License
+## Lưu ý quan trọng
 
-Apache License 2.0
+- Gateway sử dụng `host.docker.internal` để kết nối đến các services chạy trên host
+- Các microservices phải được khởi chạy trước khi gateway có thể route traffic
+- Đảm bảo ports 8001, 9001, 8002, 9002 không bị conflict với services khác

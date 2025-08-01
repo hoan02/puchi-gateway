@@ -1,0 +1,30 @@
+{
+  "auth-app-upstream": {
+    "type": "roundrobin",
+    "nodes": {
+      "auth-app:8001": 1
+    },
+    "desc": "Auth service HTTP upstream"
+  },
+  "auth-grpc-upstream": {
+    "type": "roundrobin",
+    "nodes": {
+      "auth-app:9001": 1
+    },
+    "desc": "Auth service gRPC upstream"
+  },
+  "user-app-upstream": {
+    "type": "roundrobin",
+    "nodes": {
+      "user-app:8002": 1
+    },
+    "desc": "User service HTTP upstream"
+  },
+  "user-grpc-upstream": {
+    "type": "roundrobin",
+    "nodes": {
+      "user-app:9002": 1
+    },
+    "desc": "User service gRPC upstream"
+  }
+}
