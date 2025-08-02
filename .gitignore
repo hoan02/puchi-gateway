@@ -1,5 +1,44 @@
+# APISIX logs
 /apisix_log/*
 !/apisix_log/.keep
 
+# ETCD data
 /etcd_data/*
 !/etcd_data/.keep
+
+# Go Plugin Runner binary (built file)
+go-runner
+go-runner.exe
+
+# Docker volumes
+/rabbitmq_data/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+.dockerignore
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Test files
+test-route.json
+
+# Build artifacts
+*.tar.gz
+*.zip

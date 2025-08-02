@@ -6,7 +6,7 @@ Gateway service sử dụng Apache APISIX để quản lý traffic đến các m
 
 Gateway chỉ chứa các services cần thiết cho việc routing và monitoring:
 
-- **apisix**: API Gateway chính
+- **apisix**: API Gateway chính với Go Plugin Runner
 - **etcd**: Configuration store
 - **rabbitmq**: Shared message broker
 - **prometheus**: Monitoring metrics
@@ -14,20 +14,18 @@ Gateway chỉ chứa các services cần thiết cho việc routing và monitori
 
 Các microservices chạy độc lập:
 
-- **puchi-auth-service**: Service xác thực (port 8001, 9001)
-- **puchi-user-service**: Service quản lý user (port 8002, 9002)
+- **puchi-auth-service**: Service xác thực (port 8001)
+- **puchi-user-service**: Service quản lý user (port 8002)
 
 ## Cấu hình Routing
 
 ### Auth Service Routes:
 
 - `/auth/*` → host.docker.internal:8001 (HTTP API)
-- `/auth/grpc/*` → host.docker.internal:9001 (gRPC)
 
 ### User Service Routes:
 
 - `/user/*` → host.docker.internal:8002 (HTTP API)
-- `/user/grpc/*` → host.docker.internal:9002 (gRPC)
 
 ## Ports
 
@@ -41,19 +39,40 @@ Các microservices chạy độc lập:
 
 ### External Services (chạy độc lập):
 
-- **Auth Service**: 8001 (HTTP), 9001 (gRPC)
-- **User Service**: 8002 (HTTP), 9002 (gRPC)
+- **Auth Service**: 8001 (HTTP)
+- **User Service**: 8002 (HTTP)
 
 ## Khởi chạy
 
-### 1. Khởi chạy Gateway:
+### Cách 1: Sử dụng script tự động (Khuyến nghị)
+
+```powershell
+# Lần đầu hoặc khi sửa code Go Plugin Runner
+.\setup-gateway.ps1
+
+# Chỉ start services (không build lại)
+.\setup-gateway.ps1 -StartOnly
+```
+
+### Cách 2: Thủ công
+
+#### 1. Build Go Plugin Runner (chỉ cần làm 1 lần hoặc khi sửa code):
 
 ```bash
 cd puchi-gateway
+docker build -f Dockerfile.go-runner -t go-runner:latest .
+docker create --name temp-go-runner go-runner:latest
+docker cp temp-go-runner:/usr/local/bin/main ./go-runner
+docker rm temp-go-runner
+```
+
+#### 2. Khởi chạy Gateway:
+
+```bash
 docker-compose up -d
 ```
 
-### 2. Khởi chạy các microservices độc lập:
+### 3. Khởi chạy các microservices độc lập:
 
 ```bash
 # Auth Service
@@ -65,7 +84,7 @@ cd ../puchi-user-service
 docker-compose up -d
 ```
 
-### 3. Kiểm tra kết nối:
+### 4. Kiểm tra kết nối:
 
 ```bash
 # Test Auth Service
@@ -73,6 +92,50 @@ curl http://localhost:9080/auth/
 
 # Test User Service
 curl http://localhost:9080/user/
+
+# Test Go Plugin Runner
+curl http://localhost:9080/test-go-plugin
+```
+
+## Go Plugin Runner
+
+Gateway được cấu hình với Apache APISIX Go Plugin Runner để hỗ trợ viết plugin tùy chỉnh bằng Go.
+
+### Khi sửa code Go Plugin Runner:
+
+#### Cách 1: Sử dụng script tự động
+
+```powershell
+.\rebuild-runner.ps1
+```
+
+#### Cách 2: Thủ công
+
+1. **Build lại binary:**
+
+   ```bash
+   docker build -f Dockerfile.go-runner -t go-runner:latest .
+   docker create --name temp-go-runner go-runner:latest
+   docker cp temp-go-runner:/usr/local/bin/main ./go-runner
+   docker rm temp-go-runner
+   ```
+
+2. **Restart APISIX:**
+   ```bash
+   docker-compose restart apisix
+   ```
+
+### Test Go Plugin:
+
+```bash
+# Tạo test route
+curl -X PUT "http://localhost:9180/apisix/admin/routes/1" \
+  -H "X-API-KEY: edd1c9f034335f136f87ad84b625c8f1" \
+  -H "Content-Type: application/json" \
+  -d @test-route.json
+
+# Test route
+curl http://localhost:9080/test-go-plugin
 ```
 
 ## Monitoring
@@ -96,7 +159,8 @@ APISIX_IMAGE_TAG=3.13.0-debian
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   Client        │───▶│   APISIX        │───▶│   Auth Service  │
 │                 │    │   Gateway       │    │   (Port 8001)   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
+└─────────────────┘    │   + Go Runner   │    └─────────────────┘
+                       └─────────────────┘
                               │
                        ┌─────────────────┐    ┌─────────────────┐
                        │      etcd       │    │   User Service  │
@@ -113,4 +177,6 @@ APISIX_IMAGE_TAG=3.13.0-debian
 
 - Gateway sử dụng `host.docker.internal` để kết nối đến các services chạy trên host
 - Các microservices phải được khởi chạy trước khi gateway có thể route traffic
-- Đảm bảo ports 8001, 9001, 8002, 9002 không bị conflict với services khác
+- Đảm bảo ports 8001, 8002 không bị conflict với services khác
+- Go Plugin Runner binary phải được build lại khi có thay đổi code
+- APISIX cần restart sau khi cập nhật Go Plugin Runner binary

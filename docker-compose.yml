@@ -4,6 +4,7 @@ services:
     restart: always
     volumes:
       - ./apisix_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+      - ./go-runner:/usr/local/bin/go-runner:ro
     ports:
       - "9080:9080"   # HTTP
       - "9443:9443"   # HTTPS

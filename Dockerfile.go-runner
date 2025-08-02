@@ -1,0 +1,26 @@
+FROM golang:1.21-alpine AS builder
+
+WORKDIR /app
+
+# Copy go mod files
+COPY apisix-go-plugin-runner/go.mod apisix-go-plugin-runner/go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy source code
+COPY apisix-go-plugin-runner/ ./
+
+# Build for Linux with proper permissions
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o go-runner cmd/go-runner/main.go cmd/go-runner/version.go && \
+  chmod +x go-runner && \
+  ls -la go-runner
+
+# Create final image
+FROM alpine:latest
+
+RUN apk --no-cache add ca-certificates
+
+COPY --from=builder /app/go-runner /usr/local/bin/
+
+CMD ["/usr/local/bin/go-runner", "run"] 
